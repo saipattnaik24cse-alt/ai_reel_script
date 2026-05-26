@@ -1,0 +1,570 @@
+{
+  "name": "Finance Content AI Agent Team",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -336,
+        0
+      ],
+      "id": "5f9d33aa-afc3-4d8c-ab6e-b6d8a361ebac",
+      "name": "When chat message received",
+      "webhookId": "finance-agent-webhook-001"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json.chatInput || $input.first().json.input || '';\nreturn [{ \n  json: {\n    niche: 'Personal Finance India',\n    competitors: '@pranjal.kamra, @warikoo, @sharan_hegde, @the_dailydecode',\n    topic: input,\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        48,
+        0
+      ],
+      "id": "d7d4d621-4c73-43c4-9957-ec43681da24c",
+      "name": "Setup Input"
+    },
+    {
+      "parameters": {
+        "jsCode": "try {\n  const data = $input.first().json;\n  const topic = $('Setup Input').first().json.topic;\n\n  // Get all previous search results from input chain\n  let competitorResults = 'No competitor data';\n  let trendsResults = 'No trends data';\n  let youtubeResults = 'No YouTube data';\n\n  try {\n    const comp = $('Search Competitors').first().json;\n    if (comp && comp.results) {\n      competitorResults = comp.results\n        .filter(r => r.title && r.content)\n        .map(r => 'TITLE: ' + r.title + '\\nCONTENT: ' + r.content)\n        .join('\\n\\n');\n    }\n  } catch(e1) {\n    competitorResults = 'Competitor search error: ' + e1.message;\n  }\n\n  try {\n    const trends = $('Search YouTube Trends').first().json;\n    if (trends && trends.results) {\n      trendsResults = trends.results\n        .filter(r => r.title && r.content)\n        .map(r => 'TITLE: ' + r.title + '\\nCONTENT: ' + r.content)\n        .join('\\n\\n');\n    }\n  } catch(e2) {\n    trendsResults = 'Trends search error: ' + e2.message;\n  }\n\n  try {\n    const yt = $('Search YouTube Trends').first().json;\n    if (yt && yt.results) {\n      youtubeResults = yt.results\n        .filter(r => r.title && r.content)\n        .map(r => 'TITLE: ' + r.title + '\\nCONTENT: ' + r.content)\n        .join('\\n\\n');\n    }\n  } catch(e3) {\n    youtubeResults = 'YouTube search error: ' + e3.message;\n  }\n\nreturn [{\n  json: {\n    topic: topic,\n    competitor_data: competitorResults,\n    trends_data: trendsResults,\n    youtube_data: youtubeResults,\n    instagram_summary: competitorResults.substring(0, 500),\n    youtube_summary: youtubeResults.substring(0, 500),\n    combined_context:\n      'INSTAGRAM DATA:\\n' + competitorResults +\n      '\\n\\nGOOGLE TRENDS:\\n' + trendsResults +\n      '\\n\\nYOUTUBE DATA:\\n' + youtubeResults\n  }\n}];\n\n} catch(e) {\n  return [{ json: { error: e.message } }];\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        416
+      ],
+      "id": "a21edc25-3a5b-41f7-b251-07b297778d06",
+      "name": "Merge Research"
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\n\nlet strategy;\n\nif (response.choices && response.choices[0]) {\n  strategy = response.choices[0].message.content;\n} else if (response.strategy_output) {\n  strategy = response.strategy_output;\n} else {\n  strategy = JSON.stringify(response);\n}\n\nreturn [{\n  json: {\n    strategy_output: strategy,\n    topic: $('Merge Research').first().json.topic,\n    combined_context: $('Merge Research').first().json.combined_context,\n    instagram_summary: $('Merge Research').first().json.instagram_summary,\n    youtube_summary: $('Merge Research').first().json.youtube_summary\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1104,
+        112
+      ],
+      "id": "96908536-5f24-4cb7-b861-a3d1b9b4e28f",
+      "name": "Extract Strategy"
+    },
+    {
+      "parameters": {
+        "jsCode": "try {\n  const data = $input.first().json;\n  \n  let scripts;\n  if (data.scripts_output) {\n    scripts = data.scripts_output;\n  } else if (data.choices && data.choices[0]) {\n    scripts = data.choices[0].message.content;\n  } else {\n    scripts = JSON.stringify(data);\n  }\n\n  const strategy = $('Extract Strategy').first().json.strategy_output || '';\n  const topic = $('Extract Strategy').first().json.topic || '';\n  const instagram_summary = $('Extract Strategy').first().json.instagram_summary || '';\n  const youtube_summary = $('Extract Strategy').first().json.youtube_summary || '';\n\n  return [{\n    json: {\n      scripts_output: scripts,\n      strategy_output: strategy,\n      topic: topic,\n      instagram_summary: instagram_summary,\n      youtube_summary: youtube_summary\n    }\n  }];\n\n} catch(e) {\n  return [{\n    json: {\n      error: e.message,\n      scripts_output: 'Error in Extract Scripts: ' + e.message,\n      strategy_output: '',\n      topic: '',\n      instagram_summary: '',\n      youtube_summary: ''\n    }\n  }];\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        112
+      ],
+      "id": "305fd786-7f79-4cdd-85b1-53717932bd45",
+      "name": "Extract Scripts"
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\n\nlet analysis;\nif (response.analysis_output) {\n  analysis = response.analysis_output;\n} else if (response.choices && response.choices[0]) {\n  analysis = response.choices[0].message.content;\n} else {\n  analysis = JSON.stringify(response);\n}\n\nreturn [{\n  json: {\n    analysis_output: analysis,\n    scripts_output: $('Extract Scripts').first().json.scripts_output,\n    strategy_output: $('Extract Scripts').first().json.strategy_output,\n    topic: $('Extract Scripts').first().json.topic,\n    instagram_summary: $('Extract Scripts').first().json.instagram_summary,\n    youtube_summary: $('Extract Scripts').first().json.youtube_summary\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2400,
+        112
+      ],
+      "id": "a1e48322-206f-4300-8f52-2cc7275d9b49",
+      "name": "Extract Analysis"
+    },
+    {
+      "parameters": {
+        "jsCode": "try {\n  const data = $input.first().json;\n  const timestamp = new Date().toLocaleString();\n\n  const refined = data.refined_output || JSON.stringify(data);\n  const strategy = $('Extract Strategy').first().json.strategy_output || '';\n  const scripts = $('Extract Scripts').first().json.scripts_output || '';\n  const analysis = $('Extract Analysis').first().json.analysis_output || '';\n  const topic = $('Extract Analysis').first().json.topic || 'Finance Content';\n  const instagramData = $('Extract Analysis').first().json.instagram_summary || 'No Instagram data';\n  const youtubeData = $('Extract Analysis').first().json.youtube_summary || 'No YouTube data';\n\n  const fullReport =\n    '=====================================\\n' +\n    'FINANCE CONTENT AI AGENT TEAM REPORT\\n' +\n    '=====================================\\n' +\n    'Generated: ' + timestamp + '\\n' +\n    'Topic: ' + topic + '\\n' +\n    'Platforms: Instagram Reels + YouTube Shorts\\n' +\n    'Reference: @the_dailydecode\\n\\n' +\n    '=====================================\\n' +\n    'PLATFORM RESEARCH\\n' +\n    '=====================================\\n\\n' +\n    'INSTAGRAM TRENDS:\\n' +\n    instagramData + '\\n\\n' +\n    'YOUTUBE TRENDS:\\n' +\n    youtubeData + '\\n\\n' +\n    '=====================================\\n' +\n    'AGENT 1 - CONTENT STRATEGY\\n' +\n    '=====================================\\n' +\n    strategy + '\\n\\n' +\n    '=====================================\\n' +\n    'AGENT 2 - ORIGINAL SCRIPTS\\n' +\n    '=====================================\\n' +\n    scripts + '\\n\\n' +\n    '=====================================\\n' +\n    'AGENT 3 - ANALYSIS + TRIBE v2\\n' +\n    '=====================================\\n' +\n    analysis + '\\n\\n' +\n    '=====================================\\n' +\n    'AGENT 4 - FINAL POLISHED SCRIPTS\\n' +\n    '=====================================\\n' +\n    refined + '\\n\\n' +\n    '=====================================\\n' +\n    'END OF REPORT\\n' +\n    '=====================================\\n';\n\n  const binaryData = await this.helpers.prepareBinaryData(\n    Buffer.from(fullReport, 'utf8'),\n    'finance_scripts.txt',\n    'text/plain'\n  );\n\n  return [{\n    json: {\n      report: fullReport,\n      message: 'Report generated!'\n    },\n    binary: {\n      report_file: binaryData\n    }\n  }];\n\n} catch(e) {\n  return [{\n    json: {\n      error: e.message,\n      step: 'Compile Full Report'\n    }\n  }];\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3056,
+        112
+      ],
+      "id": "f8a6a6fb-2b30-47a3-9329-e76b09d1fca9",
+      "name": "Compile Full Report"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "C:\\Scripts\\finance_scripts.txt",
+        "dataPropertyName": "report_file",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        3264,
+        112
+      ],
+      "id": "5ca90be6-1021-485a-8bc6-c92c553afa5a",
+      "name": "Save Report to File"
+    },
+    {
+      "parameters": {
+        "jsCode": "const report = $('Compile Full Report').first().json.report;\nreturn [{\n  json: {\n    output: `✅ DONE! Your finance scripts are ready!\\n\\n📁 Saved to: C:\\\\Scripts\\\\finance_scripts.txt\\n\\n--- PREVIEW ---\\n${report.substring(0, 500)}...\\n\\nOpen the file for full report with all 4 agent outputs!`\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3488,
+        112
+      ],
+      "id": "13fd1c95-84de-410a-9ef3-1c475d7f5f79",
+      "name": "Final Response"
+    },
+    {
+      "parameters": {
+        "jsCode": "const openRouterKey = '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'; // get from openrouter.ai\nconst data = $input.first().json;\n\nconst systemPrompt = `You are Agent 1 - a Finance Content Strategist for INDIAN social media audience.\n\nYou have access to data from TWO platforms:\n1. INSTAGRAM data - what @pranjal.kamra @warikoo @sharan_hegde are posting and what is performing\n2. YOUTUBE data - what finance videos are trending in India right now\n\nYOUR JOB:\nCross reference BOTH platforms to find:\n- Topics trending on BOTH YouTube AND Instagram = highest priority ideas\n- Topics viral on YouTube but NOT yet on Instagram = content opportunity\n- Angles competitors are missing = content gap nobody has covered\n\nOutput TOP 5 content ideas with EXACTLY this format:\n\n1. TOPIC: [topic name]\n   INSTAGRAM TREND: [what competitors are doing on Instagram right now]\n   YOUTUBE TREND: [what is trending on YouTube India with view count if available]\n   CONTENT GAP: [what angle nobody has covered yet]\n   HOOK ANGLE: [shocking opening line with Indian number or bold claim]\n   WHY NOW: [why this topic is hot RIGHT NOW on both platforms]\n   ENGAGEMENT POTENTIAL: [Very High or High + specific reason]\n\nINDIA SPECIFIC RULES:\n- Use Indian currency INR and Rupees not dollars\n- Reference Indian context EMIs FDs PPF SIP Mutual Funds LIC\n- Use Indian salary ranges 30k/month 50k/month 1LPA 5LPA 10LPA\n- Reference Indian problems high rent Mumbai Bangalore inflation job market\n- Mention Indian platforms Zerodha Groww PhonePe Paytm\n- Use Hinglish phrases naturally yaar bhai sach mein\n- Reference Indian life stages board exams engineering MBA rat race IT job marriage pressure EMI trap\n\nPLATFORM SPECIFIC RULES:\n- For Instagram: focus on what stops scroll in 3 seconds\n- For YouTube: focus on what gets clicks and watch time\n- Always find the CROSS PLATFORM opportunity\n- Prioritize topics that can go viral on BOTH platforms simultaneously\n\nCOMPETITOR ANALYSIS RULES:\n- Study what @pranjal.kamra posts that gets most engagement\n- Study what @warikoo angle is different from others\n- Study what @sharan_hegde does that feels native to platform\n- Find the GAP between what they cover and what audience wants`;\nconst maxChars = 3000;\nconst trimmedContext = data.combined_context \n  ? data.combined_context.substring(0, maxChars) + '...[trimmed]'\n  : 'No research data available';\nconst userPrompt = `Topic: ${data.topic}\\n\\nResearch Data:\\n${trimmedContext}`;\n\nconst response = await this.helpers.request({\n  method: 'POST',\n  url: 'https://openrouter.ai/api/v1/chat/completions',\n  headers: {\n    'Authorization': `Bearer ${openRouterKey}`,\n    'Content-Type': 'application/json',\n    'HTTP-Referer': 'https://n8n.io',\n    'X-Title': 'Finance Content Agent'\n  },\n  body: JSON.stringify({\n    model:'openrouter/free',\n    temperature: 0.7,\n    max_tokens: 2000,\n    messages: [\n      { role: 'system', content: systemPrompt },\n      { role: 'user', content: userPrompt }\n    ]\n  })\n});\n\nlet result;\ntry {\n  result = typeof response === 'string' ? JSON.parse(response) : response;\n} catch(e) {\n  return [{ json: { error: 'Parse failed: ' + e.message, raw: response } }];\n}\n\nif (!result.choices || !result.choices[0]) {\n  return [{ json: { error: 'No choices in response', raw: JSON.stringify(result) } }];\n}\n\nconst strategy = result.choices[0].message.content;\n\nreturn [{\n  json: {\n    strategy_output: strategy,\n    topic: data.topic,\n    combined_context: data.combined_context,\n    instagram_summary: data.instagram_summary,\n    youtube_summary: data.youtube_summary,\n    model_used: 'google/gemini-2.0-flash via OpenRouter'\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        112
+      ],
+      "id": "16fd9494-02e5-47eb-92bc-da2def0ca9ab",
+      "name": "agent 1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const groqKey = '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';\nconst data = $input.first().json;\n\nconst systemPrompt = `You are Agent 2 - an elite script writer for INDIAN finance content on Instagram Reels AND YouTube Shorts.\n\nYou write like top Indian creators @pranjal.kamra @warikoo @sharan_hegde - relatable, direct, emotional, Indian context.\n\nYou have been given YouTube AND Instagram trend data. Use it to make scripts feel timely and relevant.\n\nSTRICT LENGTH RULE:\n- Script must be exactly 40 seconds when spoken aloud\n- Average speaking pace is 2.5 words per second\n- Total script = maximum 100 words\n- Hook = maximum 10 words\n- Body = maximum 75 words\n- CTA = maximum 15 words\n\nSCRIPT STRUCTURE:\n1. HOOK (first 3 seconds - 10 words max)\n2. PROBLEM (relatable Indian situation)\n3. EMOTIONAL BUILDUP (make them feel it)\n4. INSIGHT OR SOLUTION (the value)\n5. PRACTICAL TAKEAWAY (one action)\n6. INSTAGRAM CTA\n7. YOUTUBE CTA\n\nHOOK RULES:\n- One shocking line only\n- Must have Indian number or bold claim\n- Never start with greeting\nGood: \"₹50,000 salary. ₹48,000 expenses. Welcome to India.\"\nGood: \"Your IT job pays 8LPA. Your EMIs cost 7LPA.\"\nGood: \"₹1 crore sounds big. Until inflation hits yaar.\"\nBad: \"Imagine waking up without stress\"\nBad: \"Hey guys welcome back\"\nBad: \"In this video I will tell you\"\n\nBODY WRITING RULES:\n- Mix short and medium sentences\n- Sound human and conversational not robotic\n- Add curiosity loops to keep watching\n- Add emotional transitions\n- Add pattern interrupts every few lines\n- Never write fragmented incomplete thoughts\n- Every sentence must feel naturally spoken\n- Sound like creator speaking on camera\n\nGOOD SCRIPT EXAMPLE (exactly 40 seconds):\nHook: ₹70,000 salary. And zero savings. How yaar?\n\nBody:\nSalary hits account on 1st.\nRent takes ₹18,000 immediately.\nEMI takes ₹15,000 next.\nSubscriptions you forgot: ₹3,000 gone.\nWeekend Swiggy and Amazon: ₹8,000 gone.\nSuddenly it is 15th of month.\nYou have ₹5,000 left bhai.\nFor next 15 days.\nThis is not bad luck.\nThis is lifestyle inflation.\nAnd nobody teaches this in India.\n\nInstagram CTA: Comment INFLATION if this hit different yaar.\nYouTube CTA: Subscribe for weekly Indian finance truths nobody tells you.\n\nPLATFORM RULES:\nInstagram Reels:\n- Hook stops scroll in 3 seconds\n- Punchy emotional lines\n- Hinglish CTA\n\nYouTube Shorts:\n- Hook stops skip in 3 seconds\n- Slightly more detail\n- Subscribe CTA at end\n\nALWAYS INCLUDE BOTH CTAs - one for each platform.\n\nMUST INCLUDE IN EVERY SCRIPT:\n- Minimum 1 emotional trigger\n- Minimum 1 curiosity loop\n- Minimum 1 relatable Indian example with real rupee amounts\n- Minimum 1 actionable takeaway\n- Real Indian products: PPF ELSS NPS FD RD Zerodha Groww Paytm\n\nHINGLISH RULES:\nUse naturally but sparingly:\nGood: \"Bhai seriously\" \"Sach mein\" \"Yaar sun\" \"Kya karoge\"\nKeep mostly English for wider reach\n\nUSE YOUTUBE AND INSTAGRAM TREND DATA PROVIDED to make hook and topic angle feel timely and viral.`;\n\n\n\nconst userPrompt = \"Write full Instagram Reels scripts for TOP 3 ideas from this strategy: \" + data.strategy_output;\n\nconst response = await this.helpers.request({\n  method: 'POST',\n  url: 'https://api.groq.com/openai/v1/chat/completions',\n  headers: {\n    'Authorization': 'Bearer ' + groqKey,\n    'Content-Type': 'application/json'\n  },\n  body: JSON.stringify({\n    model: 'llama-3.3-70b-versatile',\n    temperature: 0.8,\n    max_tokens: 7000,\n    messages: [\n      { role: 'system', content: systemPrompt },\n      { role: 'user', content: userPrompt }\n    ]\n  })\n});\n\nlet result;\ntry {\n  result = typeof response === 'string' ? JSON.parse(response) : response;\n} catch(e) {\n  return [{ json: { error: 'Parse failed: ' + e.message, raw: response } }];\n}\n\nif (!result.choices || !result.choices[0]) {\n  return [{ json: { error: 'No choices in response', raw: JSON.stringify(result) } }];\n}\n\nconst scripts = result.choices[0].message.content;\n\nreturn [{\n  json: {\n    scripts_output: scripts,\n    strategy_output: data.strategy_output,\n    topic: data.topic\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1536,
+        112
+      ],
+      "id": "4fb29f27-6690-4816-836f-69a3e98f45bd",
+      "name": "agent 2 script writer"
+    },
+    {
+      "parameters": {
+        "jsCode": "const groqKey = \n  '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';\nconst data = $input.first().json;\n\nconst systemPrompt = `You are Agent 3 - a brutal honest Script Analyst for INDIAN Instagram Reels finance content.\n\nPART 1 - STANDARD SCORING:\nScore each script out of 10 on these 5 criteria:\n1. Hook Strength - does it stop an Indian viewer scrolling?\n2. Retention Potential - will they watch till end?\n3. Clarity - is the Indian financial context clear?\n4. CTA Effectiveness - will Indians comment or share?\n5. Platform Fit - does it feel like native Indian Reels?\nStandard Total: out of 50\n\nPART 2 - TRIBE v2 FRAMEWORK (Meta's viral prediction model):\nAfter standard scoring, analyze each script using TRIBE v2:\n\nT - TRIGGER (out of 10):\nDoes the first 3 seconds create an immediate emotional reaction?\nWill an Indian viewer stop scrolling within 3 seconds?\nLook for: shocking numbers, bold claims, fear, FOMO, anger\n\nR - RELEVANCE (out of 10):\nIs this relevant to the Indian viewer RIGHT NOW in 2025?\nDoes it address current Indian financial pain points?\nLook for: EMI crisis, IT layoffs, inflation, housing prices, salary stagnation\n\nI - INFORMATION GAP (out of 10):\nDoes it make the viewer curious enough to watch till the end?\nIs there a promise of something they dont know yet?\nLook for: \"here is how\", \"the truth about\", \"nobody tells you this\"\n\nB - BENEFIT (out of 10):\nWhat does the viewer GAIN from watching this?\nIs the value clear and specific?\nLook for: specific actionable advice, clear outcome, tangible result\n\nE - EMOTION (out of 10):\nDoes it trigger a strong emotion?\nEmotions that drive shares: fear, anger, hope, surprise, pride\nLook for: relatable pain, aspirational outcome, shocking truth\n\nTRIBE v2 Total: out of 50\n\nVIRALITY PREDICTION based on TRIBE score:\n45-50: VIRAL - Post immediately\n35-44: STRONG - Will perform well  \n25-34: AVERAGE - Needs improvement\nBelow 25: WEAK - Rewrite needed\n\nINDIAN CONTEXT CHECK:\n- Are salary numbers realistic for India?\n- Are financial products India specific like PPF SIP FD Zerodha Groww?\n- Does hook relate to Indian problems like EMI rent IT jobs MBA loans?\n- Would someone in Mumbai or Bangalore share this?\n\nOUTPUT FORMAT for each script:\n---\nSCRIPT [number]: [title]\nSTANDARD SCORES:\nHook Strength: [score]/10 - [feedback]\nRetention: [score]/10 - [feedback]\nClarity: [score]/10 - [feedback]\nCTA: [score]/10 - [feedback]\nPlatform Fit: [score]/10 - [feedback]\nStandard Total: [score]/50\n\nTRIBE v2 SCORES:\nT-Trigger: [score]/10 - [what works or doesnt]\nR-Relevance: [score]/10 - [what works or doesnt]\nI-Information Gap: [score]/10 - [what works or doesnt]\nB-Benefit: [score]/10 - [what works or doesnt]\nE-Emotion: [score]/10 - [what works or doesnt]\nTRIBE Total: [score]/50\n\nVIRALITY PREDICTION: [VIRAL/STRONG/AVERAGE/WEAK]\nMUST FIX: [top 2 specific improvements]\n---`;\nconst userPrompt = \"Analyze and score these scripts using STANDARD scoring and TRIBE v2 framework: \" + data.scripts_output;\n\nawait new Promise(resolve => setTimeout(resolve, 12000));\n\nconst response = await this.helpers.request({\n  method: 'POST',\n  url: 'https://api.groq.com/openai/v1/chat/completions',\n  headers: {\n    'Authorization': 'Bearer ' + groqKey,\n    'Content-Type': 'application/json'\n  },\n  body: JSON.stringify({\n    model: 'llama-3.3-70b-versatile',\n    temperature: 0.5,\n    max_tokens: 3000,\n    messages: [\n      { role: 'system', content: systemPrompt },\n      { role: 'user', content: userPrompt }\n    ]\n  })\n});\n\nlet result;\ntry {\n  result = typeof response === 'string' ? JSON.parse(response) : response;\n} catch(e) {\n  return [{ json: { error: 'Parse failed: ' + e.message, raw: response } }];\n}\n\nif (!result.choices || !result.choices[0]) {\n  return [{ json: { error: 'No choices in response', raw: JSON.stringify(result) } }];\n}\n\nconst analysis = result.choices[0].message.content;\n\nreturn [{\n  json: {\n    analysis_output: analysis,\n    scripts_output: data.scripts_output,\n    strategy_output: data.strategy_output,\n    topic: data.topic\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2176,
+        112
+      ],
+      "id": "a109a74e-a0d2-4539-b436-266059483fc7",
+      "name": "agent 3 analyst"
+    },
+    {
+      "parameters": {
+        "jsCode": "const groqKey = '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';\nconst data = $input.first().json;\n\nconst systemPrompt = `You are Agent 4 - The Script Refiner for Indian Instagram Reels finance content.\n\nYour job: Fix weaknesses WITHOUT removing content. Make scripts BETTER not SHORTER.\n\nSTRICT RULES:\n1. KEEP the full script length — 30 to 45 seconds when spoken\n2. NEVER reduce to bullet points — write full flowing sentences\n3. HOOK: One shocking line under 10 words with specific Indian number\n4. BODY: Keep storytelling intact. Short sentences BUT complete thoughts. Build tension. Create emotion. Use rhythm.\n5. CTA: Interactive and Indian feeling\n\nGOOD REFINED SCRIPT EXAMPLE:\nHook: 30,000 salary. 35,000 expenses. Kya karoge yaar?\nBody:\nYou wake up on 1st.\nSalary credited. 30,000.\nHome loan EMI: 15,000. Gone.\nCar EMI: 8,000. Gone.\nCredit card: 5,000. Gone.\nGroceries: 5,000. Gone.\nYou have 0 left bhai.\nThis is not living. This is surviving.\nBut here is what nobody tells you.\nStart one SIP. Just 1000.\nIn 10 years it becomes 2.3 lakhs.\nThat is how you escape.\nCTA: Comment EMI if this hit different yaar. Tag someone who needs to see this.\n\nBAD REFINED SCRIPT:\nHook: Stuck in EMI trap?\nBody: Prioritize needs. Use snowball method. Invest SIP.\nCTA: Comment EMI.\n\nRULES FOR REFINEMENT:\n- Fix the hook if weak — make it shocking with Indian numbers\n- Fix sentences that are too long — break into short punchy lines\n- Fix generic CTAs — make them interactive and Indian\n- Keep all the good storytelling from Agent 2\n- Add Hinglish naturally where it fits\n- Never remove data or examples — they make scripts credible\n- Final script must be 30 to 45 seconds when read aloud\n- Minimum 10 lines in body section\n- NEVER end with \"Toh aap kya karenge\" or any vague question — always end with ONE specific action the viewer can do TODAY (example: \"Kal apna bank statement kholo. 3 hidden charges dhundo. Unhe band karo aaj hi.\")\n- If the script contains a factual error (example: saying PPF is not tax-free when it IS tax-free EEE status), CORRECT it silently — never pass wrong finance facts to the viewer\n- If the hook promises a number (example: \"7 types\") the body MUST deliver that exact number — never promise 7 and show 3\n- Every line must add NEW information — never repeat the same \n  advice in different words just to hit the line count\n- NEVER tell the viewer to \"consult a financial advisor\" or \n  \"talk to your agent\" — give them the direct answer yourself`;\n\nconst userPrompt = \"Refine these scripts: \" + data.scripts_output + \" Based on this feedback: \" + data.analysis_output;\n\nconst response = await this.helpers.request({\n  method: 'POST',\n  url: 'https://api.groq.com/openai/v1/chat/completions',\n  headers: {\n    'Authorization': 'Bearer ' + groqKey,\n    'Content-Type': 'application/json'\n  },\n  body: JSON.stringify({\n    model: 'llama-3.3-70b-versatile',\n    temperature: 0.7,\n    max_tokens: 4000,\n    messages: [\n      { role: 'system', content: systemPrompt },\n      { role: 'user', content: userPrompt }\n    ]\n  })\n});\n\nlet result;\ntry {\n  result = typeof response === 'string' ? JSON.parse(response) : response;\n} catch(e) {\n  return [{ json: { error: 'Parse failed: ' + e.message, raw: response } }];\n}\n\nif (!result.choices || !result.choices[0]) {\n  return [{ json: { error: 'No choices in response', raw: JSON.stringify(result) } }];\n}\n\nconst refined = result.choices[0].message.content;\n\nreturn [{\n  json: {\n    refined_output: refined,\n    scripts_output: data.scripts_output,\n    analysis_output: data.analysis_output,\n    strategy_output: data.strategy_output,\n    topic: data.topic\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2832,
+        112
+      ],
+      "id": "01e12bf2-4415-439b-9618-14b5da97f4ca",
+      "name": "agent 4 refiner"
+    },
+    {
+      "parameters": {
+        "amount": 10
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1968,
+        112
+      ],
+      "id": "bdd6fe58-119a-4dce-a5e2-eb86fe69e8a7",
+      "name": "Wait",
+      "webhookId": "14a5c473-dd45-4479-b71b-ca2c52dad4ea"
+    },
+    {
+      "parameters": {
+        "amount": 10
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1312,
+        112
+      ],
+      "id": "b9d210bc-e0e4-43f5-bc87-a8c73f261d12",
+      "name": "Wait1",
+      "webhookId": "be631e05-ba43-4d95-b10c-a8b3225fb729"
+    },
+    {
+      "parameters": {
+        "amount": 20
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2608,
+        112
+      ],
+      "id": "baf62391-395b-4768-9d5d-8134790f8565",
+      "name": "Wait2",
+      "webhookId": "bed6c812-7d10-41ec-b445-5e8639a882f7"
+    },
+    {
+      "parameters": {
+        "jsCode": "const competitorData = $('Search Competitors22').first().json;\nconst trendsData = $('Search Trends1').first().json;\nconst topic = $('Setup Input').first().json.topic;\n\nconst competitorResults = competitorData.results ? \n  competitorData.results.map(r => `- ${r.title}: ${r.content}`).join('\\n') : \n  'No competitor data found';\n\nconst trendsResults = trendsData.results ? \n  trendsData.results.map(r => `- ${r.title}: ${r.content}`).join('\\n') : \n  'No trends data found';\n\nreturn [{\n  json: {\n    topic: topic,\n    competitor_data: competitorResults,\n    trends_data: trendsResults,\n    combined_context: `COMPETITOR ANALYSIS:\\n${competitorResults}\\n\\nTRENDING TOPICS:\\n${trendsResults}`\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2112,
+        416
+      ],
+      "id": "fb91534a-e48b-4466-a9df-a2ae9918ddb1",
+      "name": "Merge Research1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.tavily.com/search",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "api_key",
+              "value": "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"
+            },
+            {
+              "name": "query",
+              "value": "trending personal finance topics india instagram reels 2025 viral hindi english"
+            },
+            {
+              "name": "search_depth",
+              "value": "advanced"
+            },
+            {
+              "name": "max_results",
+              "value": "5"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1264,
+        -288
+      ],
+      "id": "fdb437ce-66bc-4dec-a59d-a66b65c59c83",
+      "name": "Search Trends1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.tavily.com/search",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "api_key",
+              "value": "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"
+            },
+            {
+              "name": "query",
+              "value": "=@pranjal.kamra @warikoo @sharan_hegde instagram finance reels india trending 2025"
+            },
+            {
+              "name": "search_depth",
+              "value": "advanced"
+            },
+            {
+              "name": "max_results",
+              "value": "5"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2080,
+        -288
+      ],
+      "id": "27334ec9-4ff6-4e5c-aef6-ee886a7c2f79",
+      "name": "Search Competitors22"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.tavily.com/search",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"api_key\": \"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\",\n  \"query\": \"the_dailydecode pranjal kamra warikoo sharan hegde instagram reels finance india trending 2025 viral\",\n  \"search_depth\": \"advanced\",\n  \"max_results\": 5,\n  \"include_domains\": [\"instagram.com\", \"threads.net\"]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        288,
+        -16
+      ],
+      "id": "e6c33247-03f6-4458-a471-ee8e4c8fe9f5",
+      "name": "Search Competitors"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.tavily.com/search",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"api_key\": \"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\",\n  \"query\": \"trending indian finance youtube shorts 2025 viral most viewed money investing\",\n  \"search_depth\": \"advanced\",\n  \"max_results\": 5,\n  \"include_domains\": [\"youtube.com\", \"youtu.be\"]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        512,
+        -16
+      ],
+      "id": "9dd46657-a0ad-4e67-9d8c-6b0ebf64db92",
+      "name": "Search YouTube Trends"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Setup Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Setup Input": {
+      "main": [
+        [
+          {
+            "node": "Search Competitors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Research": {
+      "main": [
+        [
+          {
+            "node": "agent 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Strategy": {
+      "main": [
+        [
+          {
+            "node": "Wait1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Scripts": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Analysis": {
+      "main": [
+        [
+          {
+            "node": "Wait2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compile Full Report": {
+      "main": [
+        [
+          {
+            "node": "Save Report to File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Report to File": {
+      "main": [
+        [
+          {
+            "node": "Final Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "agent 1": {
+      "main": [
+        [
+          {
+            "node": "Extract Strategy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "agent 2 script writer": {
+      "main": [
+        [
+          {
+            "node": "Extract Scripts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "agent 3 analyst": {
+      "main": [
+        [
+          {
+            "node": "Extract Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "agent 4 refiner": {
+      "main": [
+        [
+          {
+            "node": "Compile Full Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "agent 3 analyst",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait1": {
+      "main": [
+        [
+          {
+            "node": "agent 2 script writer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait2": {
+      "main": [
+        [
+          {
+            "node": "agent 4 refiner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Trends1": {
+      "main": [
+        []
+      ]
+    },
+    "Search Competitors22": {
+      "main": [
+        []
+      ]
+    },
+    "Search Competitors": {
+      "main": [
+        [
+          {
+            "node": "Search YouTube Trends",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search YouTube Trends": {
+      "main": [
+        [
+          {
+            "node": "Merge Research",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "03a8e540-a559-4157-ad08-c112082e0666",
+  "meta": {
+    "instanceId": "53fe348a19b6afd3cf763ad30a271e4e6839334ccec7f838e2e5dc9c666519fe"
+  },
+  "id": "2L54QU0o41PH0LjN",
+  "tags": []
+}
